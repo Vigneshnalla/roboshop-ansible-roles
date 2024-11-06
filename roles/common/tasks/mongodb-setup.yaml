@@ -3,31 +3,44 @@
     src: mongodb.repo
     dest: /etc/yum.repos.d/mongodb.repo
 
-- name: Install mongodb client
+- name: Install MongoDB shell (mongosh)
   ansible.builtin.package:
-    name: mongodb-org-shell
+    name: mongodb-mongosh
     state: present
+- name: "Debug: Check the value of component"
+  ansible.builtin.debug:
+    msg: "The current component is: {{ component }}"
+
+- name: "Debug: Check MONGODB_HOST"
+  ansible.builtin.debug:
+    msg: "The MONGODB_HOST is: {{ MONGODB_HOST }}"
 
 - name: "get the catalogue entries count"
-  ansible.builtin.shell:  mongo --host {{MONGODB_HOST}} --quiet --eval 'db = db.getSiblingDB("catalogue"); db.products.count()'
+  ansible.builtin.shell: >
+    mongosh --host {{ MONGODB_HOST }} --quiet --eval 'db = db.getSiblingDB("catalogue"); print(db.products.countDocuments())'
   register: products_count
   when: component == "catalogue"
 
+- name: "Debug: Check products_count value"
+  ansible.builtin.debug:
+    msg: "The value of products_count is: {{ products_count.stdout | default('not available') }}"
+
 - name: "get the user entries count"
-  ansible.builtin.shell:  mongo --host {{MONGODB_HOST}} --quiet --eval 'db = db.getSiblingDB("users"); db.users.count()'
+  ansible.builtin.shell: >
+    mongosh --host {{ MONGODB_HOST }} --quiet --eval 'db = db.getSiblingDB("users"); print(db.users.countDocuments())'
   register: users_count
   when: component == "user"
 
-# - name: print the count
-#   ansible.builtin.debug:
-#     msg: "entries count: {{entries_count}}"
+- name: "Debug: Check users_count value"
+  ansible.builtin.debug:
+    msg: "The value of users_count is: {{ users_count.stdout | default('not available') }}"
 
 - name: "load catalogue data"
-  ansible.builtin.shell: "mongo --host {{MONGODB_HOST}} < /app/schema/{{component}}.js"
-  when: component == "catalogue" and products_count.stdout == "0"  # keep double quotes
-  #ignore_errors: true
+  ansible.builtin.shell: >
+    mongosh --host {{ MONGODB_HOST }} < /app/schema/{{ component }}.js
+  when: component == "catalogue" and products_count.stdout | default('0') == "0"
 
 - name: "load user data"
-  ansible.builtin.shell: "mongo --host {{MONGODB_HOST}} < /app/schema/{{component}}.js"
-  when: component == "user" and users_count.stdout == "0"  # keep double quotes
-  #ignore_errors: true
+  ansible.builtin.shell: >
+    mongosh --host {{ MONGODB_HOST }} < /app/schema/{{ component }}.js
+  when: component == "user" and users_count.stdout | default('0') == "0"
